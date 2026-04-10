@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* -------------------- Root Colors -------------------- */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --font-sans: 'Arial', 'Helvetica', sans-serif;
+  --font-mono: monospace;
+}
+
+/* Dark Mode Colors */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+/* -------------------- Body Base Styles -------------------- */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+}
+
+/* -------------------- Dropdown Animation -------------------- */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* -------------------- Optional Enhancements -------------------- */
+/* Smooth hover transition for buttons globally */
+button {
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+/* Subtle focus outline */
+button:focus {
+  outline: 2px solid #2563eb; /* Tailwind blue-600 */
+  outline-offset: 2px;
+}
