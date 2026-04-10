@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * Orders Dashboard Page
+ * ---------------------
+ * Displays all user orders with filtering.
+ * Users can:
+ * - View order details
+ * - Track RMAs
+ * - Create new RMA requests
+ */
+
+
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -11,6 +22,8 @@ export default function Dashboard() {
 
   const [filterType, setFilterType] = useState("sales_order");
   const [searchText, setSearchText] = useState("");
+
+  const mockRmaOrders = ["1", "3"];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -25,7 +38,7 @@ export default function Dashboard() {
 
       const { data, error } = await supabase
         .from("orders")
-        .select("*")
+        .select(`*, order_items (id, initial_purchased_quantity, returnable_quantity_left)`)
         .eq("user_id", userData.user.id);
 
       if (!error && data) {
@@ -40,23 +53,18 @@ export default function Dashboard() {
   }, []);
 
   const handleSearch = () => {
-    if (!searchText) {
-      setFilteredOrders(orders);
-      return;
-    }
+    if (!searchText) return setFilteredOrders(orders);
 
     const filtered = orders.filter((order) => {
       if (filterType === "sales_order") {
-        return order.sales_order
-          ?.toLowerCase()
-          .includes(searchText.toLowerCase());
+        return order.sales_order?.toLowerCase().includes(searchText.toLowerCase());
       }
 
       if (filterType === "order_date") {
-        const formattedDate = new Date(order.order_date)
+        return new Date(order.order_date)
           .toLocaleDateString()
-          .toLowerCase();
-        return formattedDate.includes(searchText.toLowerCase());
+          .toLowerCase()
+          .includes(searchText.toLowerCase());
       }
 
       return true;
@@ -71,157 +79,290 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return <p style={{ padding: 20 }}>Loading...</p>;
+    return (
+      <div style={pageBg}>
+        <div style={loadingWrap}>
+          <div style={spinner} />
+          <span>Loading orders...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ padding: 40, fontFamily: "Arial" }}>
-      
-      {/* HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <h1
-          style={{
-            fontSize: "34px",
-            fontWeight: "bold",
-            marginBottom: 30,
-          }}
-        >
-          Orders Dashboard
-        </h1>
+    <div style={pageBg}>
+      <div style={container}>
 
-        <button
-          onClick={handleLogout}
-          style={{
-            backgroundColor: "#e53935",
-            color: "#fff",
-            padding: "10px 16px",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            height: "fit-content",
-          }}
-        >
-          Logout
-        </button>
+        {/* HEADER */}
+        <div style={header}>
+          <div>
+            <h1 style={title}>Orders Dashboard</h1>
+            <p style={subtitle}>Manage orders and return requests</p>
+          </div>
+
+          <button onClick={handleLogout} style={dangerBtn}>
+            Logout
+          </button>
+        </div>
+
+        <p style={userText}>Logged in as: {user?.email}</p>
+
+        {/* FILTER CARD */}
+        <div style={card}>
+          <div style={filterRow}>
+
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              style={input}
+            >
+              <option value="sales_order">Sales Order</option>
+              <option value="order_date">Order Date</option>
+            </select>
+
+            <input
+              type="text"
+              placeholder="Search orders..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              style={input}
+            />
+
+            <button onClick={handleSearch} style={primaryBtn}>
+              Search
+            </button>
+
+          </div>
+        </div>
+
+        {/* TABLE */}
+        <div style={card}>
+          {filteredOrders.length === 0 ? (
+            <div style={emptyState}>No orders found</div>
+          ) : (
+            <table style={table}>
+              <thead>
+                <tr>
+                  <th style={th}>Sales Order</th>
+                  <th style={th}>Date</th>
+                  <th style={th}>Items</th>
+                  <th style={th}>Returnable</th>
+                  <th style={th}>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredOrders.map((order) => {
+                  const hasRMA = mockRmaOrders.includes(String(order.id));
+                  const totalItems = order.order_items?.length || 0;
+
+                  const returnableItems =
+                    order.order_items?.filter(
+                      (i: any) => i.returnable_quantity_left > 0
+                    ).length || 0;
+
+                  return (
+                    <tr key={order.id} style={row}>
+                      <td
+                        style={link}
+                        onClick={() => (window.location.href = `/orders/${order.id}`)}
+                      >
+                        {order.sales_order}
+                      </td>
+
+                      <td style={td}>
+                        {new Date(order.order_date).toLocaleDateString()}
+                      </td>
+
+                      <td style={td}>{totalItems}</td>
+                      <td style={td}>{returnableItems}</td>
+
+                      <td style={td}>
+                        <div style={actionWrap}>
+
+                          {hasRMA && (
+                            <button
+                              onClick={() => (window.location.href = `/rma/${order.id}`)}
+                              style={secondaryBtn}
+                            >
+                              Track
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() =>
+                              (window.location.href = `/rma/create?orderId=${order.id}`)
+                            }
+                            style={primaryBtn}
+                          >
+                            Create RMA
+                          </button>
+
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
       </div>
-
-      {/* USER */}
-      <p style={{ marginBottom: 20 }}>Welcome: {user?.email}</p>
-
-      {/* FILTER BOX */}
-      <div
-        style={{
-          border: "1px solid #ddd",
-          padding: 15,
-          borderRadius: 8,
-          marginBottom: 20,
-          backgroundColor: "#fafafa",
-        }}
-      >
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          style={{ padding: 8, marginRight: 10 }}
-        >
-          <option value="sales_order">Sales Order</option>
-          <option value="order_date">Order Date</option>
-        </select>
-
-        <input
-          type="text"
-          placeholder="Enter search..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSearch();
-          }}
-          style={{ padding: 8, marginRight: 10 }}
-        />
-
-        <button
-          onClick={handleSearch}
-          style={{
-            padding: "8px 16px",
-            backgroundColor: "#1976d2",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          Search
-        </button>
-      </div>
-
-      {/* TABLE */}
-      {filteredOrders.length === 0 ? (
-        <p>No orders found</p>
-      ) : (
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-          }}
-        >
-          <thead>
-            <tr style={{ backgroundColor: "#f5f5f5" }}>
-              <th style={thStyle}>Sales Order</th>
-              <th style={thStyle}>Order Date</th>
-              <th style={thStyle}>Items Purchased</th>
-              <th style={thStyle}>Returnable Left</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredOrders.map((order) => (
-              <tr key={order.id}>
-                <td style={tdStyle}>
-                  <span
-                    onClick={() =>
-                      (window.location.href = `/orders/${order.id}`)
-                    }
-                    style={{
-                      color: "#1976d2",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                      textDecoration: "underline",
-                    }}
-                  >
-                    {order.sales_order}
-                  </span>
-                </td>
-
-                <td style={tdStyle}>
-                  {new Date(order.order_date).toLocaleDateString()}
-                </td>
-
-                <td style={tdStyle}>
-                  {order.items_purchased_initially}
-                </td>
-
-                <td style={tdStyle}>
-                  {order.items_left_for_return}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
     </div>
   );
 }
 
-// STYLES (safe version, no TS issues)
-const thStyle: any = {
-  border: "1px solid #ddd",
-  padding: "12px",
-  textAlign: "center",
-  fontWeight: "bold",
+/* ================= CONSISTENT UI THEME ================= */
+
+const pageBg: any = {
+  background: "#f0f2f5",
+  minHeight: "100vh",
+  padding: "32px 24px",
+  fontFamily: "'DM Sans', sans-serif",
 };
 
-const tdStyle: any = {
-  border: "1px solid #ddd",
-  padding: "12px",
+const container: any = {
+  maxWidth: "1200px",
+  margin: "0 auto",
+};
+
+const header: any = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
+};
+
+const title: any = {
+  fontSize: "26px",
+  fontWeight: 700,
+  color: "#0f172a",
+};
+
+const subtitle: any = {
+  fontSize: "14px",
+  color: "#6b7280",
+};
+
+const userText: any = {
+  marginBottom: "16px",
+  fontSize: "13px",
+  color: "#6b7280",
+};
+
+const card: any = {
+  background: "#fff",
+  border: "1px solid #e5e7eb",
+  borderRadius: "12px",
+  padding: "16px",
+  marginBottom: "16px",
+  boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+};
+
+const filterRow: any = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+};
+
+const input: any = {
+  padding: "9px 10px",
+  borderRadius: "8px",
+  border: "1px solid #e5e7eb",
+  fontSize: "13px",
+  outline: "none",
+  transition: "0.15s",
+};
+
+const primaryBtn: any = {
+  background: "#1d4ed8",
+  color: "#fff",
+  border: "none",
+  padding: "9px 14px",
+  borderRadius: "8px",
+  fontSize: "13px",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const secondaryBtn: any = {
+  background: "#f0fdf4",
+  color: "#16a34a",
+  border: "1px solid #bbf7d0",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  fontSize: "13px",
+  cursor: "pointer",
+};
+
+const dangerBtn: any = {
+  background: "#ef4444",
+  color: "#fff",
+  border: "none",
+  padding: "8px 14px",
+  borderRadius: "8px",
+  fontSize: "13px",
+  cursor: "pointer",
+};
+
+const table: any = {
+  width: "100%",
+  borderCollapse: "collapse",
+};
+
+const th: any = {
+  textAlign: "left",
+  padding: "10px",
+  fontSize: "12px",
+  color: "#6b7280",
+  borderBottom: "1px solid #e5e7eb",
+};
+
+const td: any = {
+  padding: "12px 10px",
+  fontSize: "13px",
+  borderBottom: "1px solid #f1f5f9",
+  color: "#111827",
+};
+
+const link: any = {
+  ...td,
+  color: "#1d4ed8",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const row: any = {
+  transition: "0.15s",
+};
+
+const actionWrap: any = {
+  display: "flex",
+  gap: "8px",
+};
+
+const emptyState: any = {
   textAlign: "center",
+  padding: "40px",
+  color: "#9ca3af",
+};
+
+const loadingWrap: any = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "10px",
+  padding: "80px",
+  color: "#6b7280",
+};
+
+const spinner: any = {
+  width: "18px",
+  height: "18px",
+  border: "2px solid #e5e7eb",
+  borderTop: "2px solid #1d4ed8",
+  borderRadius: "50%",
+  animation: "spin 0.7s linear infinite",
 };
