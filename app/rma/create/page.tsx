@@ -7,11 +7,12 @@
  */
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 
 export default function CreateRMA() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const orderId = searchParams.get("orderId");
 
   const [order, setOrder] = useState<any>(null);
@@ -87,23 +88,34 @@ export default function CreateRMA() {
   const selectedCount = Object.keys(selectedItems).length;
   const allSelected = selectedCount === returnableCount && returnableCount > 0;
 
-  const handleSubmit = async () => {
-    const entries = Object.entries(selectedItems);
-    if (entries.length === 0) {
-      alert("Select at least one item to continue.");
-      return;
-    }
-    const hasMissingReason = entries.some(([_, val]: any) => !val.reason);
-    if (hasMissingReason) {
-      alert("Please select a return reason for all selected items.");
-      return;
-    }
-    setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 800));
-    console.log("RMA DATA:", selectedItems);
-    alert("RMA Submitted successfully.");
-    setSubmitting(false);
-  };
+const handleSubmit = async () => {
+  const entries = Object.entries(selectedItems);
+
+  if (entries.length === 0) {
+    alert("Select at least one item to continue.");
+    return;
+  }
+
+  const hasMissingReason = entries.some(([_, val]: any) => !val.reason);
+  if (hasMissingReason) {
+    alert("Please select a return reason for all selected items.");
+    return;
+  }
+
+  setSubmitting(true);
+
+  // Navigate to Review page with data
+  router.push(
+    `/rma/review?data=${encodeURIComponent(
+      JSON.stringify({
+        order,
+        items,
+        selectedItems,
+        user,
+      })
+    )}`
+  );
+};
 
   if (loading) {
     return (
@@ -161,7 +173,7 @@ export default function CreateRMA() {
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                       <path d="M2 7.5L6 11.5L13 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    Submit RMA
+                    Validate
                   </>
                 )}
               </button>
@@ -380,7 +392,7 @@ export default function CreateRMA() {
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                       <path d="M2 7.5L6 11.5L13 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    Submit RMA
+                    Validate
                   </>
                 )}
               </button>
