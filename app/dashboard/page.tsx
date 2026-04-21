@@ -19,7 +19,6 @@ export default function Dashboard() {
     const fetchData = async () => {
       setLoading(true);
 
-      // ✅ Get logged-in user
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -31,7 +30,6 @@ export default function Dashboard() {
 
       setUser(user);
 
-      // ✅ Fetch orders
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select("*")
@@ -44,7 +42,6 @@ export default function Dashboard() {
         return;
       }
 
-      // ✅ Fetch returnable items from VIEW (single source of truth)
       const { data: returnableData, error: returnableError } = await supabase
         .from("order_items_with_returnable")
         .select("*");
@@ -55,7 +52,6 @@ export default function Dashboard() {
         return;
       }
 
-      // ✅ Enrich orders with returnable info
       const enriched = (ordersData || []).map((order: any) => {
         const items = (returnableData || []).filter(
           (r: any) => r.order_id === order.id
@@ -84,7 +80,6 @@ export default function Dashboard() {
     fetchData();
   }, [router]);
 
-  // ✅ Search handler
   const handleSearch = () => {
     if (!searchText) {
       setFilteredOrders(orders);

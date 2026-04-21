@@ -1,201 +1,289 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "../../../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 
-export default function RmaDetailsPage() {
+type RMA = {
+  id: string;
+  rma_number: string;
+  order_id: string;
+  status: string;
+  created_at: string;
+};
+
+type RMAItem = {
+  id: string;
+  product_name: string;
+  sku: string;
+  quantity: number;
+  reason: string;
+  comments?: string;
+};
+
+export default function RMADetailsPage() {
   const { id } = useParams();
   const router = useRouter();
-  const isMounted = useRef(false);
 
-  const [rma, setRma] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+  const [rma, setRma] = useState<RMA | null>(null);
+  const [items, setItems] = useState<RMAItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    isMounted.current = true;
+    if (!id) return;
 
-    const fetchRMA = async () => {
-      if (!id) return;
+    let isMounted = true;
 
+    const fetchData = async () => {
       setLoading(true);
+      setError(null);
 
-      // ✅ Auth check
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        // ✅ Auth check
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!user) {
-        router.replace("/");
-        return;
-      }
-
-      // ✅ Fetch RMA (secure: user-specific)
-      const { data: rmaData, error: rmaError } = await supabase
-        .from("rma_requests")
-        .select("*")
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .single();
-
-      if (rmaError || !rmaData) {
-        if (isMounted.current) {
-          setLoading(false);
-          setRma(null);
+        if (!user) {
+          router.replace("/");
+          return;
         }
-        return;
-      }
 
-      // ✅ Fetch RMA items
-      const { data: itemData, error: itemError } = await supabase
-        .from("rma_items")
-        .select("*")
-        .eq("rma_id", id);
+        // ✅ Fetch RMA
+        const { data: rmaData, error: rmaError } = await supabase
+          .from("rma_requests")
+          .select("*")
+          .eq("id", id)
+          .eq("user_id", user.id)
+          .single();
 
-      if (itemError) {
-        console.error(itemError);
-      }
+        if (rmaError || !rmaData) {
+          throw new Error("RMA not found or access denied");
+        }
 
-      if (isMounted.current) {
-        setRma(rmaData);
-        setItems(itemData || []);
-        setLoading(false);
+        // ✅ Fetch items
+        const { data: itemData, error: itemError } = await supabase
+          .from("rma_items")
+          .select("*")
+          .eq("rma_id", id);
+
+        if (itemError) {
+          throw new Error("Failed to fetch RMA items");
+        }
+
+        if (isMounted) {
+          setRma(rmaData);
+          setItems(itemData || []);
+        }
+      } catch (err: any) {
+        console.error(err);
+        if (isMounted) {
+          setError(err.message || "Something went wrong");
+        }
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
-    fetchRMA();
+    fetchData();
 
     return () => {
-      isMounted.current = false;
+      isMounted = false;
     };
   }, [id, router]);
 
+  // ---------------------------
+  // UI STATES
+  // ---------------------------
+
   if (loading) {
+    return <div style={styles.loading}>Loading RMA details...</div>;
+  }
+
+  if (error) {
     return (
-      <div style={styles.page}>
-        <div style={styles.card}>Loading RMA details...</div>
+      <div style={styles.errorBox}>
+        <p>{error}</p>
+        <button onClick={() => window.location.reload()}>
+          Retry
+        </button>
       </div>
     );
   }
 
   if (!rma) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.card}>
-          <h2>RMA not found</h2>
-          <button onClick={() => router.push("/dashboard")}>
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
+    return <div style={styles.errorBox}>RMA not found</div>;
   }
 
+  // ---------------------------
+  // MAIN UI
+  // ---------------------------
+
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        {/* HEADER */}
-        <button
-          style={styles.back}
-          onClick={() => router.push("/dashboard")}
-        >
-          ← Back to Dashboard
+    <div style={styles.container}>
+      {/* HEADER */}
+      <div style={styles.header}>
+        <button style={styles.backBtn} onClick={() => router.back()}>
+          ← Back
         </button>
 
-        <h2 style={styles.success}>Created Successfully!</h2>
+        <div style={styles.headerContent}>
+          <h1 style={styles.title}>{rma.rma_number}</h1>
 
-        <div style={styles.meta}>
-          <p><b>RMA Number:</b> {rma.rma_number}</p>
-          <p><b>Status:</b> {rma.status}</p>
-          <p><b>Order ID:</b> {rma.order_id}</p>
-          <p>
-            <b>Created At:</b>{" "}
-            {new Date(rma.created_at).toLocaleString()}
-          </p>
-          <p>
-            <b>Returned Items:</b> {items.length}
-          </p>
+          <span
+            style={{
+              ...styles.badge,
+              background:
+                rma.status === "cancelled" ? "#fee2e2" : "#dcfce7",
+              color:
+                rma.status === "cancelled" ? "#991b1b" : "#166534",
+            }}
+          >
+            {rma.status || "submitted"}
+          </span>
+        </div>
+      </div>
+
+      {/* META */}
+      <div style={styles.meta}>
+        <div>
+          <strong>Order ID:</strong> {rma.order_id}
         </div>
 
-        {/* ITEMS LIST */}
-        <div style={styles.items}>
-          <h3>Item Details</h3>
+        <div>
+          <strong>Created:</strong>{" "}
+          {new Date(rma.created_at).toLocaleString()}
+        </div>
 
-          {items.map((item) => (
-            <div key={item.id} style={styles.item}>
-              <div style={styles.itemTitle}>
-                {item.product_name}
-              </div>
+        <div>
+          <strong>Total Items:</strong> {items.length}
+        </div>
+      </div>
 
-              <div style={styles.itemMeta}>
-                <span>SKU: {item.sku}</span>
-                <span>Qty: {item.quantity}</span>
-                <span>Reason: {item.reason}</span>
-              </div>
+      {/* ITEMS */}
+      <div style={styles.section}>
+        <h2 style={styles.sectionTitle}>Returned Items</h2>
 
-              {item.comments && (
-                <div style={styles.comment}>
-                  Notes: {item.comments}
+        {items.length === 0 ? (
+          <p>No items found</p>
+        ) : (
+          <div style={styles.itemsList}>
+            {items.map((item) => (
+              <div key={item.id} style={styles.card}>
+                <div style={styles.cardHeader}>
+                  <span style={styles.product}>
+                    {item.product_name}
+                  </span>
+                  <span style={styles.qty}>
+                    Qty: {item.quantity}
+                  </span>
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
+
+                <div style={styles.metaRow}>
+                  <span>SKU: {item.sku}</span>
+                  <span>Reason: {item.reason}</span>
+                </div>
+
+                {item.comments && (
+                  <div style={styles.comment}>
+                    {item.comments}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
+// ---------------------------
+// STYLES
+// ---------------------------
+
 const styles: any = {
-  page: {
-    minHeight: "100vh",
-    background: "#f3f4f6",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-    fontFamily: "sans-serif",
-  },
-  card: {
-    width: 500,
-    background: "white",
+  container: {
     padding: 24,
-    borderRadius: 12,
-    border: "1px solid #e5e7eb",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.05)",
+    fontFamily: "sans-serif",
+    maxWidth: 900,
+    margin: "0 auto",
   },
-  back: {
-    marginBottom: 10,
-    background: "none",
-    border: "none",
-    color: "#2563eb",
-    cursor: "pointer",
+  loading: {
+    padding: 24,
   },
-  success: {
-    color: "#16a34a",
-    marginBottom: 16,
+  errorBox: {
+    padding: 24,
+    color: "red",
   },
-  meta: {
-    fontSize: 14,
+  header: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
     marginBottom: 20,
   },
-  items: {
-    marginTop: 10,
-  },
-  item: {
-    border: "1px solid #e5e7eb",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-  },
-  itemTitle: {
-    fontWeight: 600,
-    marginBottom: 4,
-  },
-  itemMeta: {
+  headerContent: {
     display: "flex",
+    alignItems: "center",
     gap: 12,
+  },
+  backBtn: {
+    border: "1px solid #ddd",
+    padding: "6px 10px",
+    borderRadius: 6,
+    cursor: "pointer",
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 600,
+  },
+  badge: {
+    padding: "4px 8px",
+    borderRadius: 6,
+    fontSize: 12,
+    fontWeight: 500,
+  },
+  meta: {
+    display: "flex",
+    gap: 20,
+    marginBottom: 20,
+    fontSize: 14,
+  },
+  section: {
+    marginTop: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 600,
+    marginBottom: 12,
+  },
+  itemsList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
+  card: {
+    border: "1px solid #e5e7eb",
+    borderRadius: 10,
+    padding: 12,
+    background: "#fff",
+  },
+  cardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  product: {
+    fontWeight: 600,
+  },
+  qty: {
+    fontSize: 13,
+    color: "#555",
+  },
+  metaRow: {
+    display: "flex",
+    gap: 16,
     fontSize: 13,
     color: "#555",
   },
