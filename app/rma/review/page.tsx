@@ -58,6 +58,8 @@ export default function ReviewRMA() {
         comments: val.comments || null,
       }));
 
+      console.log("RMA ITEMS PAYLOAD:", payload);
+      
       const { data: rmaId, error } = await supabase.rpc("create_rma", {
         p_user_id: session.user.id,
         p_order_id: order.id,

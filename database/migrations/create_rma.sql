@@ -1,91 +1,75 @@
-CREATE OR REPLACE FUNCTION public.create_rma (
-    p_user_id  UUID,
-    p_order_id UUID,
-    p_items    JSONB
-)
-RETURNS UUID
-LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION public.create_rma(p_user_id uuid, p_order_id uuid, p_items jsonb)
+ RETURNS uuid
+ LANGUAGE plpgsql
 AS $$
 DECLARE
-    v_rma_id     UUID;
-    v_rma_number TEXT;
-    v_item       RECORD;
+  new_rma_id UUID;
+  new_rma_number TEXT;
+  item RECORD;
 BEGIN
-    /* =========================
-       Generate RMA number
-    ========================== */
-    v_rma_number := 'RMA-' || EXTRACT(EPOCH FROM NOW())::BIGINT;
 
-    /* =========================
-       Validate input
-    ========================== */
-    IF NOT validate_rma_items(p_items) THEN
-        RAISE EXCEPTION
-            'Invalid RMA: quantity exceeds allowed limit';
-    END IF;
+  -- Generate RMA number (simple timestamp-based)
+  -- Generate RMA number (sequential + formatted)
+  new_rma_number := 
+    'RMA-' || TO_CHAR(NOW(), 'YYYY') || '-' ||
+    LPAD(nextval('rma_number_seq')::TEXT, 6, '0');
 
-    /* =========================
-       Create RMA request
-    ========================== */
-    INSERT INTO rma_requests (
-        id,
-        rma_number,
-        order_id,
-        status,
-        created_at,
-        user_id
+  -- Validate items first
+  IF NOT validate_rma_items(p_items) THEN
+    RAISE EXCEPTION 'Invalid RMA: quantity exceeds allowed limit';
+  END IF;
+
+  -- Insert into rma_requests
+  INSERT INTO rma_requests (
+    id,
+    rma_number,
+    order_id,
+    status,
+    created_at,
+    user_id
+  )
+  VALUES (
+    gen_random_uuid(),
+    new_rma_number,
+    p_order_id,
+    'submitted',
+    NOW(),
+    p_user_id
+  )
+  RETURNING id INTO new_rma_id;
+
+  -- Insert each item
+  FOR item IN SELECT * FROM jsonb_to_recordset(p_items)
+    AS x(order_item_id UUID, quantity INT, reason TEXT, comments TEXT)
+  LOOP
+
+    INSERT INTO rma_items (
+      id,
+      rma_id,
+      order_item_id,
+      product_name,
+      sku,
+      quantity,
+      reason,
+      comments,
+      created_at
     )
-    VALUES (
-        gen_random_uuid(),
-        v_rma_number,
-        p_order_id,
-        'submitted',
-        NOW(),
-        p_user_id
-    )
-    RETURNING id INTO v_rma_id;
+    SELECT
+      gen_random_uuid(),
+      new_rma_id,
+      oi.id,
+      oi.product_name,
+      oi.sku,
+      item.quantity,
+      item.reason,
+      item.comments,
+      NOW()
+    FROM order_items oi
+    WHERE oi.id = item.order_item_id;
 
-    /* =========================
-       Insert RMA items
-    ========================== */
-    FOR v_item IN
-        SELECT *
-        FROM jsonb_to_recordset(p_items) AS x(
-            order_item_id UUID,
-            quantity      INT,
-            reason        TEXT,
-            comments      TEXT
-        )
-    LOOP
-        INSERT INTO rma_items (
-            id,
-            rma_id,
-            order_item_id,
-            product_name,
-            sku,
-            quantity,
-            reason,
-            comments,
-            created_at
-        )
-        SELECT
-            gen_random_uuid(),
-            v_rma_id,
-            oi.id,
-            oi.product_name,
-            oi.sku,
-            v_item.quantity,
-            v_item.reason,
-            v_item.comments,
-            NOW()
-        FROM order_items oi
-        WHERE oi.id = v_item.order_item_id;
-    END LOOP;
+  END LOOP;
 
-    /* =========================
-       Return result
-    ========================== */
-    RETURN v_rma_id;
+  RETURN new_rma_id;
 
 END;
-$$;
+$$

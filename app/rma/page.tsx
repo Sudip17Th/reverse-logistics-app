@@ -53,7 +53,7 @@ export default function MyRMAsPage() {
     fetchRmas();
   }, [router]);
 
-  // ✅ CANCEL RMA
+  // ✅ CANCEL RMA (FIXED: now uses RPC)
   const handleCancel = async (rmaId: string) => {
     const confirmCancel = window.confirm(
       "Are you sure you want to cancel this RMA?"
@@ -61,15 +61,14 @@ export default function MyRMAsPage() {
 
     if (!confirmCancel) return;
 
-    const { error } = await supabase
-      .from("rma_requests")
-      .update({
-        status: "cancelled",
-        cancelled_at: new Date(),
-      })
-      .eq("id", rmaId);
+    const { error } = await supabase.rpc("cancel_rma", {
+      p_rma_id: rmaId,
+      p_reason: "User cancelled",
+      p_comments: "",
+    });
 
     if (error) {
+      console.error("Cancel error:", error);
       alert("Failed to cancel RMA");
       return;
     }
