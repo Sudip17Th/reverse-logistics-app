@@ -3,12 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import CancelRmaModal from "../components/CancelRmaModal";
 
 export default function MyRMAsPage() {
   const router = useRouter();
 
   const [rmas, setRmas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ✅ NEW STATE (modal)
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRmaId, setSelectedRmaId] = useState<string | null>(null);
 
   // ✅ FETCH RMAs
   useEffect(() => {
@@ -24,7 +29,6 @@ export default function MyRMAsPage() {
         return;
       }
 
-      // ✅ JOIN ITEMS PROPERLY
       const { data, error } = await supabase
         .from("rma_requests")
         .select(`
@@ -40,7 +44,6 @@ export default function MyRMAsPage() {
         return;
       }
 
-      // ✅ COMPUTE ITEM COUNT
       const enriched = (data || []).map((rma: any) => ({
         ...rma,
         total_items: rma.rma_items?.length || 0,
@@ -53,18 +56,17 @@ export default function MyRMAsPage() {
     fetchRmas();
   }, [router]);
 
-  // ✅ CANCEL RMA (FIXED: now uses RPC)
-  const handleCancel = async (rmaId: string) => {
-    const confirmCancel = window.confirm(
-      "Are you sure you want to cancel this RMA?"
-    );
-
-    if (!confirmCancel) return;
+  // ✅ NEW: CANCEL VIA RPC
+  const handleCancel = async (data: {
+    reason: string;
+    comments: string;
+  }) => {
+    if (!selectedRmaId) return;
 
     const { error } = await supabase.rpc("cancel_rma", {
-      p_rma_id: rmaId,
-      p_reason: "User cancelled",
-      p_comments: "",
+      p_rma_id: selectedRmaId,
+      p_reason: data.reason,
+      p_comments: data.comments,
     });
 
     if (error) {
@@ -76,11 +78,15 @@ export default function MyRMAsPage() {
     // ✅ Update UI instantly
     setRmas((prev) =>
       prev.map((rma) =>
-        rma.id === rmaId
+        rma.id === selectedRmaId
           ? { ...rma, status: "cancelled" }
           : rma
       )
     );
+
+    // ✅ Close modal
+    setIsModalOpen(false);
+    setSelectedRmaId(null);
   };
 
   if (loading) {
@@ -89,6 +95,7 @@ export default function MyRMAsPage() {
 
   return (
     <div style={styles.container}>
+      
       <h1 style={styles.title}>My RMAs</h1>
 
       {rmas.length === 0 ? (
@@ -150,7 +157,11 @@ export default function MyRMAsPage() {
                   {rma.status !== "cancelled" && (
                     <button
                       style={styles.cancelBtn}
-                      onClick={() => handleCancel(rma.id)}
+                      onClick={() => {
+                        console.log("CANCEL CLICKED", rma.id);
+                        setSelectedRmaId(rma.id);
+                        setIsModalOpen(true);
+                      }}
                     >
                       Cancel
                     </button>
@@ -161,11 +172,21 @@ export default function MyRMAsPage() {
           </tbody>
         </table>
       )}
+
+      {/* ✅ MODAL */}
+      <CancelRmaModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedRmaId(null);
+        }}
+        onSubmit={handleCancel}
+      />
     </div>
   );
 }
 
-// ✅ SIMPLE CLEAN STYLES
+// ✅ STYLES
 const styles: any = {
   container: {
     padding: 24,
