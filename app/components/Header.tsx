@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import Button from "./ui/Button";
 
 export default function Header() {
   const router = useRouter();
@@ -35,142 +36,98 @@ export default function Header() {
     router.replace("/");
   };
 
-  // -----------------------------
-  // ACTIVE LINK HELPER
-  // -----------------------------
-  const isActive = (path: string) => {
-    return pathname === path;
-  };
-
   return (
-    <header style={styles.header}>
+    <header
+      style={{
+        width: "100%",
+        height: 60,
+        padding: "0 20px",
+        borderBottom: "1px solid #e5e7eb",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        background: "#fff",
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+      }}
+    >
       {/* LEFT: LOGO */}
-      <div style={styles.left}>
-        <span
-          style={styles.logo}
-          onClick={() => router.push("/dashboard")}
-        >
-          Reverse Logistics
-        </span>
+      <div
+        style={{ fontWeight: 700, cursor: "pointer" }}
+        onClick={() => router.push("/dashboard")}
+      >
+        Reverse Logistics
       </div>
 
       {/* RIGHT: NAV + USER */}
-      <div style={styles.right}>
-        {/* NAV LINKS */}
-        <nav style={styles.nav}>
-          <button
-            style={{
-              ...styles.link,
-              ...(isActive("/dashboard") ? styles.active : {}),
-            }}
-            onClick={() => router.push("/dashboard")}
-          >
-            Create RMA
-          </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        {/* NAV */}
+        <Button
+          variant={pathname === "/dashboard" ? "primary" : "ghost"}
+          onClick={() => router.push("/dashboard")}
+        >
+          Create RMA
+        </Button>
 
-          <button
-            style={{
-              ...styles.link,
-              ...(pathname.startsWith("/rma") &&
-              pathname === "/rma"
-                ? styles.active
-                : {}),
-            }}
-            onClick={() => router.push("/rma")}
-          >
-            My RMAs
-          </button>
-        </nav>
+        <Button
+          variant={pathname === "/rma" ? "primary" : "ghost"}
+          onClick={() => router.push("/rma")}
+        >
+          My RMAs
+        </Button>
 
-        {/* USER INFO */}
+        {/* USER SECTION */}
         {!loading && user && (
-          <div style={styles.user}>
-            <span style={styles.email}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginLeft: 10,
+              paddingLeft: 10,
+              borderLeft: "1px solid #e5e7eb",
+            }}
+          >
+            {/* PROFILE ICON */}
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "#1d4ed8",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              {user.email?.charAt(0).toUpperCase()}
+            </div>
+
+            {/* EMAIL */}
+            <span
+              style={{
+                fontSize: 12,
+                color: "#6b7280",
+                maxWidth: 140,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {user.email}
             </span>
 
-            <button
-              style={styles.logout}
-              onClick={handleLogout}
-            >
+            {/* LOGOUT */}
+            <Button variant="danger" onClick={handleLogout}>
               Logout
-            </button>
+            </Button>
           </div>
         )}
       </div>
     </header>
   );
 }
-
-const styles: any = {
-  header: {
-    width: "100%",
-    height: 60,
-    padding: "0 24px",
-    borderBottom: "1px solid #e5e7eb",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    background: "#ffffff",
-    position: "sticky",
-    top: 0,
-    zIndex: 100,
-  },
-
-  left: {
-    display: "flex",
-    alignItems: "center",
-  },
-
-  logo: {
-    fontSize: 16,
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-
-  right: {
-    display: "flex",
-    alignItems: "center",
-    gap: 24,
-  },
-
-  nav: {
-    display: "flex",
-    gap: 16,
-  },
-
-  link: {
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    fontSize: 14,
-    padding: "6px 10px",
-    borderRadius: 6,
-    color: "#374151",
-  },
-
-  active: {
-    background: "#e0e7ff",
-    color: "#1d4ed8",
-  },
-
-  user: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-  },
-
-  email: {
-    fontSize: 12,
-    color: "#6b7280",
-  },
-
-  logout: {
-    border: "1px solid #e5e7eb",
-    background: "#fff",
-    padding: "6px 10px",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontSize: 12,
-  },
-};
