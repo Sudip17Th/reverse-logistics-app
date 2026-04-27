@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 import "../../../styles/rma.css";
 
-export default function CreateRMA() {
+function CreateRMAContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderId = searchParams.get("orderId");
@@ -18,7 +18,9 @@ export default function CreateRMA() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // ✅ FETCH DATA
+  // -----------------------------
+  // FETCH DATA
+  // -----------------------------
   useEffect(() => {
     const fetchData = async () => {
       if (!orderId) {
@@ -62,7 +64,9 @@ export default function CreateRMA() {
     fetchData();
   }, [orderId, router]);
 
-  // ✅ TOGGLE ITEM
+  // -----------------------------
+  // TOGGLE ITEM
+  // -----------------------------
   const handleToggle = (id: string, max: number) => {
     setSelectedItems((prev: any) => {
       const updated = { ...prev };
@@ -82,7 +86,9 @@ export default function CreateRMA() {
     });
   };
 
-  // ✅ CHANGE HANDLER
+  // -----------------------------
+  // CHANGE HANDLER
+  // -----------------------------
   const handleChange = (
     id: string,
     field: string,
@@ -111,7 +117,9 @@ export default function CreateRMA() {
 
   const selectedCount = Object.keys(selectedItems).length;
 
-  // ✅ SUBMIT → SAVE DRAFT
+  // -----------------------------
+  // VALIDATE (UNCHANGED LOGIC)
+  // -----------------------------
   const handleSubmit = () => {
     const entries = Object.entries(selectedItems);
 
@@ -131,7 +139,6 @@ export default function CreateRMA() {
 
     setSubmitting(true);
 
-    // 🔥 STORE ONLY WHAT YOU NEED
     sessionStorage.setItem(
       "rma_draft",
       JSON.stringify({
@@ -143,6 +150,9 @@ export default function CreateRMA() {
     router.push("/rma/review");
   };
 
+  // -----------------------------
+  // LOADING
+  // -----------------------------
   if (loading) {
     return (
       <div className="rma-page">
@@ -154,6 +164,9 @@ export default function CreateRMA() {
     );
   }
 
+  // -----------------------------
+  // EMPTY STATE
+  // -----------------------------
   if (!items.length) {
     return (
       <div className="rma-page">
@@ -173,13 +186,6 @@ export default function CreateRMA() {
 
         <div className="rma-header">
           <div className="rma-header-left">
-            <button
-              className="rma-back-btn"
-              onClick={() => router.back()}
-            >
-              ← Back
-            </button>
-
             <div className="rma-breadcrumb">
               <span className="rma-breadcrumb-dim">Orders</span>
               <span className="rma-breadcrumb-sep">/</span>
@@ -254,7 +260,6 @@ export default function CreateRMA() {
 
                 {selected && (
                   <div className="rma-item-controls">
-
                     <div className="rma-qty-control">
                       <button
                         onClick={() =>
@@ -305,7 +310,16 @@ export default function CreateRMA() {
           })}
         </div>
 
+        <div style={{ height: 80 }} />
       </div>
     </div>
+  );
+}
+
+export default function CreateRMA() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CreateRMAContent />
+    </Suspense>
   );
 }
